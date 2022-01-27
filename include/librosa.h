@@ -102,22 +102,23 @@ public:
     return X_vector;
   }
 
-  static std::vector<std::vector<float>> abs_cqt(std::vector<float> &x,
-                                                 float sr=22050, 
-                                                 int hop_length=512, 
-                                                 float fmin=-1.f, 
-                                                 int n_bins=84, 
-                                                 int bins_per_octave=12,
-                                                 float tuning=0.0, 
-                                                 float filter_scale=1.f, 
-                                                 int norm=1,
-                                                 std::string window="hann", 
-                                                 bool scale=true, 
-                                                 std::string pad_mode="reflect"){
+  static std::vector<std::vector<float>> cqtspectrogram(std::vector<float> &x,
+                                                       float sr=22050, 
+                                                       int hop_length=512, 
+                                                       float fmin=-1.f, 
+                                                       int n_bins=84, 
+                                                       int bins_per_octave=12,
+                                                       float tuning=0.0, 
+                                                       float filter_scale=1.f, 
+                                                       int norm=1,
+                                                       std::string window="hann", 
+                                                       bool scale=true, 
+                                                       std::string pad_mode="reflect",
+                                                       float power=1.f){
     
     Vectorf map_x = Eigen::Map<Vectorf>(x.data(), x.size());
-    Matrixf X = librosa::cqt::cqt(map_x, sr, hop_length, fmin, n_bins, bins_per_octave, tuning, filter_scale, norm,
-                                  window, scale, pad_mode).array().abs();
+    Matrixf X = librosa::cqt::cqtspectrogram(map_x, sr, hop_length, fmin, n_bins, bins_per_octave, 
+                                            tuning, filter_scale, norm, window, scale, pad_mode);
     std::vector<std::vector<float>> X_vector(X.rows(), std::vector<float>(X.cols(), 0));
     for (int i = 0; i < X.rows(); ++i){
       auto &row = X_vector[i];

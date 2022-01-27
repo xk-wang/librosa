@@ -2,6 +2,7 @@
 #define CONSTANT_Q_H_
 
 #include <cmath>
+#include <complex>
 #include <string>
 #include <algorithm>
 #include <exception>
@@ -27,19 +28,24 @@ namespace librosa{
 
       Matrixcf basis;
       Vectorf lengths;
-      filters::constant_q(basis, lengths, sr, fmin, n_bins, bins_per_octave, 
-                                   tuning, window, filter_scale, true, norm);
+
+      basis = librosa::filters::constant_q(lengths, sr, fmin, n_bins, bins_per_octave, 
+                                   tuning, window, filter_scale, true, norm); 
+                          
       int n_frames = basis.rows(), n_fft = basis.cols(), n_f = n_fft/2+1;
       if(hop_length>0 && n_fft < std::pow(2.f, 1+std::ceil(std::log2(hop_length)))){
         n_fft = int(std::pow(2.f, 1+std::ceil(std::log2f(hop_length))));
       }
-      basis *= lengths / float(n_fft);
+
+      basis = basis.array() * (lengths.replicate(n_fft, 1).transpose().array()) / float(n_fft);
 
       Eigen::FFT<float> fft;
+      Matrixcf out_basis(n_frames, n_fft);
       for (int i = 0; i < n_frames; ++i){
-        basis.row(i) = fft.fwd(basis.row(i));
+        out_basis.row(i) = fft.fwd(basis.row(i), n_fft);
       }
-      fft_basis = basis.leftCols(n_f);
+      fft_basis = out_basis.leftCols(n_f);
+
       return n_fft;
     }
 
@@ -48,15 +54,17 @@ namespace librosa{
                                 int hop_length,
                                 const Matrixcf& fft_basis,
                                 const std::string& mode){
-
-      Matrixcf D = stft::stft(y, n_fft, hop_length, "ones", true, mode);
+      
+      Matrixcf D = stft::stft(y, n_fft, hop_length, "ones", true, mode).transpose();
       return fft_basis*D;
     }
 
     static Vectorf cqt_frequencies(int n_bins, float f_min, int bins_per_octave=12, float tuning=0.0){
+
       float correction = std::pow(2.f, tuning/bins_per_octave);
-      Vectorf frequencies = pow(2.f, Vectorf::LinSpaced(n_bins, 0, n_bins-1).array());
-      return frequencies;
+      Vectorf frequencies = f_min*pow(2.f, Vectorf::LinSpaced(n_bins, 0, n_bins-1).array()/bins_per_octave);
+      return correction*frequencies;
+    
     }
 
     static int _num_two_factors(int x){
@@ -86,36 +94,37 @@ namespace librosa{
           throw std::invalid_argument("Input signal y is too short");
         }
         float new_sr = sr / float(downsample_factor);
+
         y = librosa::audio::resample(y, sr, new_sr, res_type, true, true);
+
         if(!scale) y*=std::sqrt(downsample_factor);
         sr = new_sr;
       }
     }
 
     static Matrixcf cqt(Vectorf& y, 
-                      float sr=22050, 
-                      int hop_length=512, 
-                      float fmin=-1.f, 
-                      int n_bins=84, 
-                      int bins_per_octave=12,
-                      float tuning=0.0, 
-                      float filter_scale=1.f, 
-                      int norm=1,
-                      std::string window="hann", 
-                      bool scale=true, 
-                      std::string pad_mode="reflect") {
+                        float sr=22050, 
+                        int hop_length=512, 
+                        float fmin=-1.f, 
+                        int n_bins=84, 
+                        int bins_per_octave=12,
+                        float tuning=0.0, 
+                        float filter_scale=1.f, 
+                        int norm=1,
+                        std::string window="hann", 
+                        bool scale=true, 
+                        std::string pad_mode="reflect") {
     
       int n_octaves = int(std::ceil(float(n_bins) / bins_per_octave));
       int n_filters = std::min(bins_per_octave, n_bins);
-      int len_orig = y.size();
 
       if(fmin<0) fmin = 32.703196; // C1 fmin = note_to_hz("C1");
-      if(std::abs(tuning)>1e-6){
-        throw std::invalid_argument("tuning is not fully supported!");
+      if(tuning<0){
+        throw std::invalid_argument("estimate tuning is not supported!");
       }
       // if(tuning<0) estimate_tuning(y, sr);
 
-      Vectorf freqs = cqt_frequencies(n_bins, fmin, bins_per_octave).rightCols(bins_per_octave);
+      Vectorf freqs = cqt_frequencies(n_bins, fmin, bins_per_octave).rightCols(bins_per_octave);  
       float fmin_t = freqs.minCoeff();
       float fmax_t = freqs.maxCoeff();
 
@@ -130,16 +139,20 @@ namespace librosa{
       }
 
       __early_downsample(y, sr, hop_length, res_type, n_octaves, nyquist, filter_cutoff, scale);
+
+      int frames = y.size()/hop_length+1;
       
-      Matrixcf cqt_resp(bins_per_octave*n_octaves, len_orig/hop_length+1);
+      Matrixcf cqt_resp(bins_per_octave*n_octaves, frames);
 
       Matrixcf fft_basis;
       int n_fft;
 
+      int octave_offset = 0;
       if(res_type!="kaiser_fast"){
+
         n_fft = __cqt_filter_fft(fft_basis, sr, fmin_t, n_filters, bins_per_octave, tuning,
                                     filter_scale, norm, window);
-        cqt_resp.topRows(n_filters) = __cqt_response(y, n_fft, hop_length, fft_basis, pad_mode);
+        cqt_resp.bottomRows(n_filters) = __cqt_response(y, n_fft, hop_length, fft_basis, pad_mode).colwise().reverse();
 
         fmin_t /= 2;
         fmax_t /= 2;
@@ -147,6 +160,7 @@ namespace librosa{
         
         filter_cutoff = fmax_t * (1+0.5*filters::WINDOW_BANDWIDTHS[window]/Q);
         res_type = "kaiser_fast";
+        octave_offset = 1;
       }
 
       int num_twos = _num_two_factors(hop_length);
@@ -158,29 +172,66 @@ namespace librosa{
                                filter_scale, norm, window);
       
       Vectorf my_y = y;
+
+      
       float my_sr = sr;
       int my_hop = hop_length;
 
       for(int i=0; i<n_octaves; ++i){
+
         if(i>0){
+
           if(my_y.size()<2){
             throw std::invalid_argument("input signal is too short");
           }
+
           my_y = librosa::audio::resample(my_y, my_sr, my_sr / 2.f, res_type, true, true);
+
           fft_basis *= std::sqrt(2);
+      // std::cout << "fft_basis: " <<" " << fft_basis.array().abs().rowwise().sum().transpose() << std::endl << std::endl;
+
           my_sr /= 2.f;
           my_hop /= 2;
         }
-        cqt_resp.topRows(n_filters) = __cqt_response(my_y, n_fft, my_hop, fft_basis, pad_mode);
+      
+      // std::cout << "my_y: " << my_y.array().abs().sum() << " " << my_y.size() << std::endl;
+
+      //  std::cout << "D " << __cqt_response(my_y, n_fft, my_hop, fft_basis, pad_mode).array().abs().sum() << std::endl;
+      cqt_resp.block((n_octaves-i-1)*n_filters, 0, n_filters, frames) = __cqt_response(my_y, n_fft, my_hop, fft_basis, pad_mode).colwise().reverse();
+
       }
 
       Matrixcf C = cqt_resp.topRows(n_bins);
+      std::cout << "C: " << C.array().abs().rowwise().sum().transpose() << std::endl;
 
       if(scale){
         Vectorf lengths = filters::constant_q_lengths(sr, fmin, n_bins, bins_per_octave, tuning, window, filter_scale);
-        C = C.array() / lengths.array().sqrt();
+        C = C.array() / lengths.replicate(C.cols(), 1).transpose().array().sqrt();
       }
+
       return C;
+    }
+
+    static Matrixf cqtspectrogram(Vectorf& y,
+                                 float sr=22050, 
+                                 int hop_length=512, 
+                                 float fmin=-1.f, 
+                                 int n_bins=84, 
+                                 int bins_per_octave=12,
+                                 float tuning=0.0, 
+                                 float filter_scale=1.f, 
+                                 int norm=1,
+                                 std::string window="hann", 
+                                 bool scale=true, 
+                                 std::string pad_mode="reflect",
+                                 float power=1.f){
+
+
+      Matrixcf C = cqt(y, sr, hop_length, fmin, n_bins, bins_per_octave, tuning, filter_scale,
+              norm, window, scale, pad_mode);
+              
+      Matrixf spectrogram = librosa::util::spectrogram(C, power);
+      return spectrogram;    
     }
 
   }

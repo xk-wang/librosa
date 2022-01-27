@@ -95,6 +95,14 @@ namespace librosa{
       coeff /= bins_per_octave;
       Vectorf freq = fmin*pow(2.f, coeff.array());
 
+      // std::cout << "max_freq: " << freq(n_bins-1) << std::endl
+      //           << "nyquist: " << sr/2.f << std::endl
+      //           << "bins_per_octave: " << bins_per_octave << std::endl
+      //           << freq << std::endl
+      //           << coeff <<std::endl
+      //           << pow(2.f, coeff.array()) << std::endl
+      //           << "fmin: " << fmin << std::endl;
+
       if(freq(n_bins-1)*(1+0.5*WINDOW_BANDWIDTHS[window]/Q) > sr/2.f){
         throw std::invalid_argument("Filter pass-band lies beyond Nyquist");
       }
@@ -102,41 +110,49 @@ namespace librosa{
       return lengths;
     }
 
-    static void constant_q(Matrixcf& filters, Vectorf& lengths,
+    static Matrixcf constant_q(Vectorf& lengths,
                            float sr, float fmin=-1, int n_bins=84, 
                            int bins_per_octave=12, float tuning=0.0,
                            const std::string& window="hann", float filter_scale=1.f,
                            bool pad_fft=true, int norm=1){
-    
+      
       if(fmin<0) fmin = 32.703196; // C1
+
       lengths = constant_q_lengths(sr, fmin, n_bins, bins_per_octave, tuning, window, filter_scale);
+
       float correction = std::pow(2.f, tuning / bins_per_octave);
       fmin = correction*fmin;
       float Q = filter_scale / (std::pow(2.f, 1.f/bins_per_octave)-1);
       auto freqs = Q*sr/lengths.array();
-    
+
       int max_len;
       if(pad_fft) max_len = int(std::pow(2.f, std::ceil(std::log2f(lengths.maxCoeff()))));
       else max_len = int(std::ceil(lengths.maxCoeff()));
-      filters.resize(lengths.size(), max_len);
+      Matrixcf filters(lengths.size(), max_len);
 
       std::complex<float> a(0, 1);
 
       for(int i=0; i<lengths.size(); ++i){
         int ilen = int(lengths[i]);
         float freq = freqs[i];
-        Vectorcf sig = exp(Vectorf::LinSpaced(ilen/2*2, static_cast<float>(-ilen/2), static_cast<float>(ilen/2))
-                      .array()*a*2*M_PI*freq/sr);
+        Vectorcf sig = exp(Vectorf::LinSpaced(ilen, static_cast<float>(std::floor(-ilen/2.f)), static_cast<float>(ilen/2-1))
+                      .array()*a*2*M_PI*freq/sr);     
+        
         // 计算窗函数
-        sig = sig*get_window(window, sig.size());
+        sig = sig.array()*(get_window(window, sig.size()).array());
+        
         // sig = normalize(sig, norm=norm); 完成normalize的步骤 按照行相加归一化
         float norm = sig.lpNorm<1>();
+
         if(norm > 1e-7){
           sig /= norm;
         }
+        
         int left = (max_len - ilen)/2, right = max_len - ilen - left;
-        filters.row(0) = util::pad(sig, left, right, "constant");
+        filters.row(i) = util::pad(sig, left, right, "constant");
       }
+
+      return filters;
     }
 
     static Matrixf melfilter(int sr, int n_fft, int n_mels, int fmin, int fmax, bool htk = false){

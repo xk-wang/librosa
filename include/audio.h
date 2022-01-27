@@ -60,9 +60,11 @@ namespace librosa{
       }
 
       Vectorf target_y = Eigen::Map<Vectorf>(data_out.get(), n_samples);
+
       if(fix){
         target_y = util::fix_length(target_y, n_samples);
       }
+
       if(scale){
         target_y /= std::sqrt(ratio);
       }

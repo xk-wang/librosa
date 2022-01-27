@@ -19,7 +19,7 @@ namespace librosa{
       Matrixf mel_basis = librosa::filters::melfilter(sr, n_fft, n_mels, fmin, fmax, htk);
       Matrixf sp = librosa::util::spectrogram(X, power);
       Matrixf mel = mel_basis*sp.transpose();
-      return mel;
+      return mel.transpose();
     }
 
     static Matrixf dct(Matrixf& x, bool norm, int type) {

@@ -7,8 +7,11 @@
 
 #include <eigen3/Eigen/Core>
 #include <eigen3/unsupported/Eigen/FFT>
+#include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/Cholesky>
 
 typedef Eigen::Matrix<float, 1, Eigen::Dynamic, Eigen::RowMajor> Vectorf;
+typedef Eigen::Array<int, 1, Eigen::Dynamic, Eigen::RowMajor> Arrayi;
 typedef Eigen::Matrix<std::complex<float>, 1, Eigen::Dynamic, Eigen::RowMajor> Vectorcf;
 typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> Matrixf;
 typedef Eigen::Matrix<std::complex<float>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> Matrixcf;

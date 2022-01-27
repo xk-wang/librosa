@@ -67,6 +67,9 @@ namespace librosa{
       {
         new_y = pad(y, 0, size - n, "constant");
       }
+      else{
+        new_y = y;
+      }
       return new_y;
     }
 
