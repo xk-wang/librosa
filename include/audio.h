@@ -25,6 +25,7 @@ namespace librosa{
   
       if(std::abs(orig_sr-target_sr)<1e-6) return y;
       float ratio = target_sr / orig_sr;
+      std::cout << "ratio: " << ratio << std::endl;
       int n_samples = int(std::ceil(y.size()*ratio));
       if(n_samples<1){
         throw std::length_error("input signal is too small");
@@ -62,6 +63,7 @@ namespace librosa{
       Vectorf target_y = Eigen::Map<Vectorf>(data_out.get(), n_samples);
 
       if(fix){
+        
         target_y = util::fix_length(target_y, n_samples);
       }
 

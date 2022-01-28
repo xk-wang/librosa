@@ -56,6 +56,10 @@ namespace librosa{
                                 const std::string& mode){
       
       Matrixcf D = stft::stft(y, n_fft, hop_length, "ones", true, mode).transpose();
+
+      // std::cout << "D: " << D.array().abs().rowwise().sum().transpose() << std::endl << std::endl;
+      // std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+      
       return fft_basis*D;
     }
 
@@ -87,6 +91,7 @@ namespace librosa{
     static void __early_downsample(Vectorf& y, float&sr, int& hop_length, const std::string& res_type,
                           int n_octaves, float nyquist, float filter_cutoff, bool scale){
       int downsample_count = __early_downsample_count(nyquist, filter_cutoff, hop_length, n_octaves);
+      
       if(downsample_count>0 && res_type=="kaiser_fast"){
         int downsample_factor = int(std::pow(2, downsample_count));
         hop_length /= downsample_factor;
@@ -99,6 +104,9 @@ namespace librosa{
 
         if(!scale) y*=std::sqrt(downsample_factor);
         sr = new_sr;
+
+      //   std::cout << y.size() << std::endl;
+      // throw std::invalid_argument("end");
       }
     }
 
@@ -117,6 +125,22 @@ namespace librosa{
     
       int n_octaves = int(std::ceil(float(n_bins) / bins_per_octave));
       int n_filters = std::min(bins_per_octave, n_bins);
+
+      std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+      auto y1 = y;
+      // y = librosa::audio::resample(y1, sr, sr / 2.f, "kaiser_best", true, true);
+      // std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+      y = librosa::audio::resample(y1, sr, sr / 4.f, "kaiser_best", true);
+      std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+       y = librosa::audio::resample(y1, sr, sr / 8.f, "kaiser_best", true);
+      std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+       y = librosa::audio::resample(y1, sr, sr / 16.f, "kaiser_best", true);
+      std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+       y = librosa::audio::resample(y1, sr, sr / 32.f, "kaiser_best", true);
+      std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+
+      throw std::invalid_argument("end");
+
 
       if(fmin<0) fmin = 32.703196; // C1 fmin = note_to_hz("C1");
       if(tuning<0){
@@ -138,7 +162,12 @@ namespace librosa{
         res_type = "kaiser_best";
       }
 
+      std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+
       __early_downsample(y, sr, hop_length, res_type, n_octaves, nyquist, filter_cutoff, scale);
+
+      std::cout << "sum_y: " << y.size() << " " << y.array().sum() << std::endl << std::endl;
+
 
       int frames = y.size()/hop_length+1;
       
@@ -178,7 +207,7 @@ namespace librosa{
       int my_hop = hop_length;
 
       for(int i=0; i<n_octaves; ++i){
-
+      
         if(i>0){
 
           if(my_y.size()<2){
@@ -194,6 +223,8 @@ namespace librosa{
           my_hop /= 2;
         }
       
+      std::cout << "sum_y: " << my_y.size() << " " << my_y.array().sum() << std::endl << std::endl;
+
       // std::cout << "my_y: " << my_y.array().abs().sum() << " " << my_y.size() << std::endl;
 
       //  std::cout << "D " << __cqt_response(my_y, n_fft, my_hop, fft_basis, pad_mode).array().abs().sum() << std::endl;
@@ -202,7 +233,7 @@ namespace librosa{
       }
 
       Matrixcf C = cqt_resp.topRows(n_bins);
-      std::cout << "C: " << C.array().abs().rowwise().sum().transpose() << std::endl;
+      // std::cout << "C: " << C.array().abs().rowwise().sum().transpose() << std::endl;
 
       if(scale){
         Vectorf lengths = filters::constant_q_lengths(sr, fmin, n_bins, bins_per_octave, tuning, window, filter_scale);

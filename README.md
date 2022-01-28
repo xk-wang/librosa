@@ -8,3 +8,4 @@ similar with librosa, you can just use a single header [librosa.h](https://githu
 # TODO
 - fully support resampling like librosa
 - other interesting issues.
+- some bugs in the downsampling code of cqt, writing resampy in c++ soon.
