@@ -1,0 +1,1 @@
+/usr/bin/g++  -Ofast -mavx -mfma -rdynamic CMakeFiles/librosa.dir/test.cpp.o -o librosa  -lsndfile -lsamplerate 

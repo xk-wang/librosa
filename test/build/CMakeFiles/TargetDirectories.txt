@@ -1,0 +1,3 @@
+/home/wxk/wxk_home16/cpp/librosa/test/build/CMakeFiles/librosa.dir
+/home/wxk/wxk_home16/cpp/librosa/test/build/CMakeFiles/edit_cache.dir
+/home/wxk/wxk_home16/cpp/librosa/test/build/CMakeFiles/rebuild_cache.dir
